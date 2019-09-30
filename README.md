@@ -1,5 +1,5 @@
 # Frabbit
-Messing around with F#, reactive programmin, and RabbitMQ.
+Messing around with F#, reactive programming, and RabbitMQ.
 
 __Requirements:__
 - Dotnet Core 3.0
@@ -14,5 +14,5 @@ This program creates reactive streams from RabbitMQ queues to perform operations
 Overall the flow of the system is:
 
 1. Given a stream of values
-2. Pair each string with the last, putting the concattenated pairs on the logging channel. (This is the interesting part)
+2. Pair each string with the last, putting the joined pairs on the logging channel. (This is the interesting part)
 3. Log each string
