@@ -1,6 +1,5 @@
 namespace Frabbit
 
-open Frabbit.Types
 open RabbitMQ.Client
 open RabbitMQ.Client.Events
 open FSharp.Control.Reactive

@@ -7,10 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Types.fs" />
-    <Compile Include="MQ.fs" />
-    <Compile Include="Routines.fs" />
-    <Compile Include="Program.fs" />
+    <Compile Include="src/types/*.fs" />
+    <Compile Include="src/functions/*.fs" />
+    <Compile Include="src/Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
