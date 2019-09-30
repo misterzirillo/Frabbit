@@ -75,7 +75,7 @@ let main argv =
       yield "Hey Buddy!"
       yield "Hey Pal!!"
       yield "Hi Friend!"
-      yield "Hey Bro!!"
+      yield "Hey Bro or Sis!!"
     }
     |> Observable.ofSeq
     |> mapStringToPayload null
