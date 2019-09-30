@@ -2,17 +2,15 @@ namespace Frabbit
 
 open System
 open FSharp.Control.Reactive
-open RabbitMQ.Client.Events
 open RabbitMQ.Client
 
 module Routines =
 
-  let log (consumer: IObservable<BasicDeliverEventArgs>) =
+  let log (consumer: IObservable<string>) =
     consumer
-    |> Basic.mapBodyString
     |> Observable.subscribe (fun e -> printfn "%s" e)
 
-  let reinjectN(n: int, address, model: IModel) =
+  let injectN(n: int, address, model: IModel) =
     (fun p -> 
       p
       |> Observable.take n

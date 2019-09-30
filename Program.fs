@@ -14,47 +14,74 @@ f.HostName <- "localhost"
 f.VirtualHost <- "/"
 
 let exchangeName = "test1"
-let queueName = "test1"
-let routingKey = "test"
+let pairQueue = "pair"
+let logQueue = "logging"
+let pairRouting = "pair"
+let logRouting = "log"
 
 [<EntryPoint>]
 let main argv =
 
     // create model
     use conn = f.CreateConnection()
-    use model = conn.CreateModel()
+    use model1 = conn.CreateModel()
+    use model2 = conn.CreateModel()
 
     // declare rabbit things
-    model.ExchangeDeclare(exchangeName, ExchangeType.Direct, false, true)
-    let q = model.QueueDeclare(queueName, false, true, true, null)
-    model.QueueBind(queueName, exchangeName, routingKey, null)
+    model1.ExchangeDeclare(exchangeName, ExchangeType.Direct, false, true)
+    let q1 = model1.QueueDeclare(pairQueue, false, true, true, null)
+    model1.QueueBind(pairQueue, exchangeName, pairRouting, null)
 
-    let props = model.CreateBasicProperties()
-    let address = PublicationAddress(ExchangeType.Direct, exchangeName, routingKey)
+    model2.ExchangeDeclare(exchangeName, ExchangeType.Direct, false, true)
+    let q2 = model1.QueueDeclare(logQueue, false, true, true, null)
+    model2.QueueBind(logQueue, exchangeName, logRouting, null)
 
-    // set up consumer
-    let consumer = EventingBasicConsumer(model)
-    let deliveryObserver = observeConsumer(consumer)
+    let respondAddress = PublicationAddress(ExchangeType.Direct, exchangeName, pairRouting)
+    let logAddress = PublicationAddress(ExchangeType.Direct, exchangeName, logRouting)
 
-    use __ = Routines.log(deliveryObserver)
+    // set echo up consumer
+    let echoConsumer = EventingBasicConsumer(model1)
+    let echoObserver = observeConsumer(echoConsumer)
+
+    let mapEcho deliveries =
+      mapBodyString deliveries
+      |> Observable.pairwise
+      |> Observable.map (fun (a, b) -> sprintf "%s--%s" a b) 
     
+    // re-send deliveries with echos
     use __ = 
-      deliveryObserver
+      echoObserver
+      |> mapEcho
+      |> mapStringToPayload null
+      |> publish(logAddress, model2)
+      |> Observable.subscribe ignore
+
+    // set up log consumer
+    let logConsumer = EventingBasicConsumer(model2)
+    let logObserver = observeConsumer(logConsumer)
+
+    // log event content
+    use __ =
+      logObserver
       |> mapBodyString
-      |> Observable.map (fun s -> s + " -- Hi again!")
-      |> mapStringToPayload(props)
-      |> Routines.reinjectN(10, address, model)
+      |> Routines.log
 
-    // start consumer
-    model.BasicConsume(q.QueueName, true, consumer) |> ignore
+    // start consumers
+    model1.BasicConsume(q1.QueueName, true, echoConsumer) |> ignore
+    model2.BasicConsume(q2.QueueName, true, logConsumer) |> ignore
     
-    // send a message
-    seq { yield "Hey!"; yield "Hi there!" }
+    // queue some greetings
+    seq {
+      yield "Hey Buddy!"
+      yield "Hey Pal!!"
+      yield "Hi Friend!"
+      yield "Hey Bro!!"
+    }
     |> Observable.ofSeq
-    |> mapStringToPayload props
-    |> publish(address, model)
-    |> Observable.wait
+    |> mapStringToPayload null
+    |> publish(respondAddress, model1)
+    |> Observable.wait // blocks until all messages are published
 
-    Thread.Sleep 5000
+    Thread.Sleep 1000
 
     0 // return an integer exit code

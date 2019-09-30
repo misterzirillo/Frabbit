@@ -8,17 +8,17 @@ open System.Text
 
 module Basic =
 
-    let observeConsumer(consumer: EventingBasicConsumer) =
-        Observable.fromEventConversion
-            (fun handler -> (fun _ e -> handler e))
-            consumer.Received.AddHandler
-            consumer.Received.RemoveHandler
+  let observeConsumer(consumer: EventingBasicConsumer) =
+    Observable.fromEventConversion
+      (fun handler -> (fun _ e -> handler e))
+      consumer.Received.AddHandler
+      consumer.Received.RemoveHandler
 
-    let publish(address: PublicationAddress, model: IModel) =
-        Observable.map (fun p -> model.BasicPublish(address, p.properties, p.bytes))
+  let publish(address: PublicationAddress, model: IModel) =
+    Observable.map (fun p -> model.BasicPublish(address, p.properties, p.bytes))
 
-    let mapBodyString o =
-        Observable.map (fun (e: BasicDeliverEventArgs) -> Encoding.UTF8.GetString(e.Body)) o
+  let mapBodyString o =
+    Observable.map (fun (e: BasicDeliverEventArgs) -> Encoding.UTF8.GetString(e.Body)) o
 
-    let mapStringToPayload props = 
-        Observable.map (fun (s: string) -> { properties = props; bytes = Encoding.UTF8.GetBytes(s) })
+  let mapStringToPayload props = 
+    Observable.map (fun (s: string) -> { properties = props; bytes = Encoding.UTF8.GetBytes(s) })
