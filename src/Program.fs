@@ -7,6 +7,7 @@ open RabbitMQ.Client
 open RabbitMQ.Client.Events
 open System.Threading
 
+// Rabbit connection stuff
 let f = ConnectionFactory()
 f.UserName <- "guest"
 f.Password <- "guest"
@@ -39,14 +40,15 @@ let main argv =
     let respondAddress = PublicationAddress(ExchangeType.Direct, exchangeName, pairRouting)
     let logAddress = PublicationAddress(ExchangeType.Direct, exchangeName, logRouting)
 
-    // set echo up consumer
+    // set up echo consumer
     let echoConsumer = EventingBasicConsumer(model1)
     let echoObserver = observeConsumer(echoConsumer)
 
     let mapEcho deliveries =
       mapBodyString deliveries
+      |> Observable.choose (fun e -> match e with Ok s -> Some s | _ -> None)
       |> Observable.pairwise
-      |> Observable.map (fun (a, b) -> sprintf "%s--%s" a b) 
+      |> Observable.map (fun (a, b) -> sprintf "Buddy 1: %s\tPal 2: %s" a b) 
     
     // re-send deliveries with echos
     use __ = 
@@ -60,10 +62,16 @@ let main argv =
     let logConsumer = EventingBasicConsumer(model2)
     let logObserver = observeConsumer(logConsumer)
 
+    let loggingString e =
+      match e with
+        | Ok s -> sprintf "[LOG]\t%s" s
+        | Error s -> sprintf "[ERROR]\t%s" s
+
     // log event content
     use __ =
       logObserver
       |> mapBodyString
+      |> Observable.map loggingString
       |> Routines.log
 
     // start consumers

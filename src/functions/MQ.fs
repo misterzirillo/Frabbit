@@ -17,7 +17,11 @@ module Basic =
     Observable.map (fun p -> model.BasicPublish(address, p.properties, p.bytes))
 
   let mapBodyString o =
-    Observable.map (fun (e: BasicDeliverEventArgs) -> Encoding.UTF8.GetString(e.Body)) o
+    Observable.map (fun (e: BasicDeliverEventArgs) ->
+      try
+        Ok(Encoding.UTF8.GetString(e.Body))
+      with
+        | _ -> Error("Parsing error")) o
 
   let mapStringToPayload props = 
     Observable.map (fun (s: string) -> { properties = props; bytes = Encoding.UTF8.GetBytes(s) })
