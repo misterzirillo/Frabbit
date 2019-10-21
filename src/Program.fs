@@ -2,7 +2,7 @@
 
 open Frabbit
 open RabbitMQ.Client
-open System.Threading
+open FSharp.Control.Reactive
 
 // Rabbit connection stuff
 let f = ConnectionFactory()
@@ -33,9 +33,7 @@ let main argv =
     }
 
     use loggingChannel = conn.CreateModel()
-    use __ =
-      Activities.loggingConsumer(loggingChannel, loggingQueue)
-      |> Observable.subscribe ignore
+    let loggingStream = Activities.loggingConsumer(loggingChannel, loggingQueue)
 
     // set up a consumer that will simulate a "conversation"
     let conversationRouting = {
@@ -60,16 +58,20 @@ let main argv =
 
     
     // queue some greetings
-    Activities.publishStrings(
-      conn,
+    let greetings =
       seq {
         yield "Hey Buddy!"
         yield "Hey Pal!!"
         yield "Hi Friend!"
         yield "Hey Bro or Sis!!"
-      },
-      conversationRouting)
+      }
 
-    Thread.Sleep 1000
+    Activities.publishStrings(conn, greetings, conversationRouting)
+
+    // wait on the logger to receive the expected output
+    loggingStream
+    |> Observable.take (Seq.length(greetings) - 1)
+    |> Observable.wait
+    |> ignore
 
     0 // return an integer exit code
