@@ -3,9 +3,8 @@ namespace Frabbit
 open RabbitMQ.Client
 open RabbitMQ.Client.Events
 open FSharp.Control.Reactive
-open System.Text
 
-module Basic =
+module BasicMQ =
 
   let observeConsumer(consumer: EventingBasicConsumer) =
     Observable.fromEventConversion
@@ -13,15 +12,7 @@ module Basic =
       consumer.Received.AddHandler
       consumer.Received.RemoveHandler
 
-  let publish(address: PublicationAddress, model: IModel) =
-    Observable.map (fun p -> model.BasicPublish(address, p.properties, p.bytes))
-
-  let mapBodyString o =
-    Observable.map (fun (e: BasicDeliverEventArgs) ->
-      try
-        Ok(Encoding.UTF8.GetString(e.Body))
-      with
-        | _ -> Error("Parsing error")) o
-
-  let mapStringToPayload props = 
-    Observable.map (fun (s: string) -> { properties = props; bytes = Encoding.UTF8.GetBytes(s) })
+  let publish(routing: Routing, model: IModel) =
+    let routingKey = match routing.RoutingKey with Some r -> r | None -> "";
+    let address = PublicationAddress(null, routing.ExchangeName, routingKey)
+    Observable.map (fun p -> model.BasicPublish(address, p.Properties, p.Bytes))

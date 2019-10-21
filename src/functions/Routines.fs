@@ -1,19 +1,28 @@
 namespace Frabbit
 
-open System
 open FSharp.Control.Reactive
-open RabbitMQ.Client
+open System.Text
+open RabbitMQ.Client.Events
 
+// Common observable operations
 module Routines =
 
-  let log (consumer: IObservable<string>) =
-    consumer
-    |> Observable.subscribe (fun e -> printfn "%s" e)
+  let tee choice o =
+    let t = Observable.choose choice o
+    (t, o)
 
-  let injectN(n: int, address, model: IModel) =
-    (fun p -> 
-      p
-      |> Observable.take n
-      |> Basic.publish(address, model)
-      |> Observable.subscribe ignore)
-    
+  let mapBodyString o =
+    Observable.map (fun (e: BasicDeliverEventArgs) ->
+      try
+        Ok(Encoding.UTF8.GetString(e.Body))
+      with
+        | e -> Error(e)) o
+
+  let mapStringToPayload props = 
+    Observable.map (fun (s: string) -> { Properties = props; Bytes = Encoding.UTF8.GetBytes(s) })
+  
+  let chooseOk o =
+    o |> Observable.choose (fun e -> match e with Ok s -> Some s | _ -> None)
+
+  let chooseError o =
+    o |> Observable.choose (fun e -> match e with Error s -> Some s | _ -> None)

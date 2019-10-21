@@ -8,7 +8,9 @@
 
   <ItemGroup>
     <Compile Include="src/types/*.fs" />
-    <Compile Include="src/functions/*.fs" />
+    <Compile Include="src/functions/MQ.fs" />
+    <Compile Include="src/functions/Routines.fs" />
+    <Compile Include="src/functions/Activities.fs" />
     <Compile Include="src/Program.fs" />
   </ItemGroup>
 
