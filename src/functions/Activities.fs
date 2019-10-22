@@ -19,14 +19,16 @@ module Activities =
         model.QueueDeclare(qsetup.QueueName) |> ignore
         model.QueueBind(qsetup.QueueName, qsetup.Routing.ExchangeName, getRoutingKey(qsetup.Routing))
 
+    
+    let private exnMessage (e: exn) = e.Message
+    let private fmtError = sprintf "[ERROR]\t[%s]\t%s"
+    let private fmtOk = sprintf "[OK]\t[%s]\t%s"
 
     let private resultString tag r =
         match r with
-        | Ok s -> sprintf "[OK]\t[%s]\t%s" tag s
-        | Error e -> sprintf "[ERROR]\t[%s]\t%s" tag e
+        | Ok s -> fmtOk tag s
+        | Error e -> e |> exnMessage |> fmtError tag
     
-    let private formatException (e: exn) = e.Message
-
     
     let loggingTag queue =
         let rkey = getRoutingKey(queue.Routing)
@@ -38,20 +40,15 @@ module Activities =
         setupQueue(model, setup)
 
         let consumer = EventingBasicConsumer(model)
-        let injestMapping = consumer |> BasicMQ.observeConsumer |> Routines.mapBodyString
-        let logFormatter = setup |> loggingTag |> resultString
+        let lt = loggingTag(setup)
 
-        let happyPath = 
-            injestMapping
-            |> Routines.chooseOk
-            |> Observable.map(printfn "%s")
-
-        let sadPath =
-            injestMapping
-            |> Routines.chooseError
-            |> Observable.map (formatException >> Error >> logFormatter >> printfn "%s")
-
-        let pipeline = Observable.merge happyPath sadPath
+        let pipeline =
+            consumer
+            |> BasicMQ.observeConsumer
+            |> Routines.mapBodyString
+            |> Railway.exform (Observable.map exnMessage) exnMessage
+            |> Observable.map (fun e -> match e with Ok s -> s | Error s -> fmtError lt s)
+            |> Observable.map (printfn "%s")
 
         model.BasicConsume(setup.QueueName, true, consumer) |> ignore
         pipeline
@@ -80,7 +77,7 @@ module Activities =
             |> Observable.map speechFormat
             |> Observable.map Ok
 
-        model.BasicConsume(setup.QueueName, true, consumer) |> ignore
+        model.BasicConsume(setup.QueueName, setup.AutoAck, consumer) |> ignore
         pipeline
 
 

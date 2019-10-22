@@ -3,6 +3,7 @@
 open Frabbit
 open RabbitMQ.Client
 open FSharp.Control.Reactive
+open System
 
 // Rabbit connection stuff
 let f = ConnectionFactory()
@@ -30,6 +31,7 @@ let main _ =
       AutoDelete = true
       Durable = false
       Exclusive = true
+      AutoAck = true
     }
 
     use loggingChannel = conn.CreateModel()
@@ -49,6 +51,7 @@ let main _ =
       AutoDelete = true
       Durable = false
       Exclusive = true
+      AutoAck = true
     }
 
     let conversationTag = Activities.loggingTag(conversationQueue)

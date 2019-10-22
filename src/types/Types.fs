@@ -22,4 +22,5 @@ module Types =
         AutoDelete: bool
         Durable: bool
         Exclusive: bool
+        AutoAck: bool
     }
