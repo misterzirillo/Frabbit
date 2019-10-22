@@ -7,16 +7,31 @@ open FSharp.Control.Reactive
 // High level application activities to be executed asynchronously
 module Activities =
 
+    let private getRoutingKey routing =
+        match routing.RoutingKey with Some s -> s | None -> ""
+
     let private setupQueue (model: IModel, qsetup) =
-        let rkey = match qsetup.Routing.RoutingKey with Some s -> s | None -> ""
         model.ExchangeDeclare(
             qsetup.Routing.ExchangeName, 
             qsetup.Routing.ExchangeType,
             qsetup.Durable,
             qsetup.AutoDelete)
         model.QueueDeclare(qsetup.QueueName) |> ignore
-        model.QueueBind(qsetup.QueueName, qsetup.Routing.ExchangeName, rkey)
+        model.QueueBind(qsetup.QueueName, qsetup.Routing.ExchangeName, getRoutingKey(qsetup.Routing))
+
+
+    let private resultString tag r =
+        match r with
+        | Ok s -> sprintf "[OK]\t[%s]\t%s" tag s
+        | Error e -> sprintf "[ERROR]\t[%s]\t%s" tag e
     
+    let private formatException (e: exn) = e.Message
+
+    
+    let loggingTag queue =
+        let rkey = getRoutingKey(queue.Routing)
+        sprintf "%s:%s:%s" queue.Routing.ExchangeName queue.QueueName rkey
+
 
     // consumes a queue of strings and prints them
     let loggingConsumer (model: IModel, setup: QueueSetup) =
@@ -24,17 +39,17 @@ module Activities =
 
         let consumer = EventingBasicConsumer(model)
         let injestMapping = consumer |> BasicMQ.observeConsumer |> Routines.mapBodyString
+        let logFormatter = setup |> loggingTag |> resultString
 
         let happyPath = 
             injestMapping
             |> Routines.chooseOk
             |> Observable.map(printfn "%s")
 
-        let logFormatter = printfn "Logger error: %s"
         let sadPath =
             injestMapping
             |> Routines.chooseError
-            |> Observable.map (fun ex -> logFormatter(ex.ToString()))
+            |> Observable.map (formatException >> Error >> logFormatter >> printfn "%s")
 
         let pipeline = Observable.merge happyPath sadPath
 
@@ -42,16 +57,10 @@ module Activities =
         pipeline
 
 
-    let private resultString preamble r =
-        match r with
-        | Ok s -> sprintf "OK\t%s\t%s" preamble s
-        | Error e -> sprintf "ERROR\t%s\t%s" preamble e
-
-
     // observe a result sequence and send log strings to the logger
-    let loggingProducer preamble model routing source =
+    let loggingProducer tag model routing source =
         source
-        |> Observable.map (resultString preamble)
+        |> Observable.map (resultString tag)
         |> Routines.mapStringToPayload null
         |> BasicMQ.publish(routing, model)
 
@@ -63,11 +72,12 @@ module Activities =
         let consumer = EventingBasicConsumer(model)
         let injestMapping = consumer |> BasicMQ.observeConsumer |> Routines.mapBodyString
 
+        let speechFormat (a, b) = sprintf "Buddy 1: %s\tPal 2: %s" a b
         let pipeline = 
             injestMapping
             |> Routines.chooseOk
             |> Observable.pairwise
-            |> Observable.map (fun (a, b) -> sprintf "Buddy 1: %s\tPal 2: %s" a b) 
+            |> Observable.map speechFormat
             |> Observable.map Ok
 
         model.BasicConsume(setup.QueueName, true, consumer) |> ignore

@@ -12,7 +12,7 @@ f.HostName <- "localhost"
 f.VirtualHost <- "/"
 
 [<EntryPoint>]
-let main argv =
+let main _ =
 
     // create connection
     use conn = f.CreateConnection()
@@ -36,35 +36,36 @@ let main argv =
     let loggingStream = Activities.loggingConsumer(loggingChannel, loggingQueue)
 
     // set up a consumer that will simulate a "conversation"
+    let conversationId = "myconversation1"
     let conversationRouting = {
       ExchangeName = "conversation"
-      RoutingKey = Some "testconversation"
+      RoutingKey = Some conversationId
       ExchangeType = ExchangeType.Direct
     }
 
     let conversationQueue = {
       Routing = conversationRouting
-      QueueName = "conversation1"
+      QueueName = conversationId
       AutoDelete = true
       Durable = false
       Exclusive = true
     }
 
+    let conversationTag = Activities.loggingTag(conversationQueue)
+
     use conversationChannel = conn.CreateModel()
     use __ =
       Activities.conversationConsumer(conversationChannel, conversationQueue)
-      |> Activities.loggingProducer "conversation" conversationChannel logRouting
+      |> Activities.loggingProducer conversationTag conversationChannel logRouting
       |> Observable.subscribe ignore
-
     
     // queue some greetings
-    let greetings =
-      seq {
-        yield "Hey Buddy!"
-        yield "Hey Pal!!"
-        yield "Hi Friend!"
-        yield "Hey Bro or Sis!!"
-      }
+    let greetings = [ 
+      "Hey Buddy!"
+      "Hey Pal!!"
+      "Hi Friend!"
+      "Hey Bro or Sis!!"
+    ]
 
     Activities.publishStrings(conn, greetings, conversationRouting)
 
